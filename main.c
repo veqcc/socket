@@ -8,6 +8,7 @@
 #include	<netinet/ip_icmp.h>
 #include	<netinet/if_ether.h>
 #include	<netinet/udp.h>
+#include	<netinet/tcp.h>
 #include	<linux/if.h>
 #include	<arpa/inet.h>
 #include	<sys/wait.h>
@@ -18,6 +19,7 @@
 #include	"ip.h"
 #include	"icmp.h"
 #include	"udp.h"
+#include	"tcp.h"
 #include	"dhcp.h"
 #include	"param.h"
 #include	"cmd.h"
@@ -94,6 +96,8 @@ int ending() {
     struct ifreq if_req;
 
     printf("ending\n");
+
+    TcpAllSocketClose(DeviceSoc);
 
     if (Param.DhcpServer.s_addr != 0) {
         DhcpSendRelease(DeviceSoc);
@@ -194,6 +198,7 @@ int main(int argc, char *argv[]) {
 
     printf("IP-TTL=%d\n", Param.IpTTL);
     printf("MTU=%d\n", Param.MTU);
+    printf("MSS=%d\n",Param.MSS);
 
     srandom(time(NULL));
 

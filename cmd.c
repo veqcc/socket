@@ -8,6 +8,7 @@
 #include	<netinet/ip_icmp.h>
 #include	<netinet/if_ether.h>
 #include	<netinet/udp.h>
+#include	<netinet/tcp.h>
 #include	<linux/if.h>
 #include	<arpa/inet.h>
 #include	<sys/wait.h>
@@ -17,6 +18,7 @@
 #include	"arp.h"
 #include	"icmp.h"
 #include	"udp.h"
+#include	"tcp.h"
 #include	"param.h"
 #include	"cmd.h"
 
@@ -131,7 +133,7 @@ int DoCmdIfconfig(char **cmdline) {
         printf("DHCP start time:%s", ctime(&Param.DhcpStartTime));
         printf("DHCP lease time:%d\n", Param.DhcpLeaseTime);
     }
-    printf("IpTTL=%d,MTU=%d\n", Param.IpTTL, Param.MTU);
+    printf("IpTTL=%d,MTU=%d,MSS=%d\n",Param.IpTTL,Param.MTU,Param.MSS);
 
     return (0);
 }
@@ -141,6 +143,7 @@ int DoCmdNetstat(char **cmdline) {
     printf("proto:no:port=data\n");
     printf("------------------------------\n");
     UdpShowTable();
+    TcpShowTable();
 
     return (0);
 }
@@ -205,6 +208,84 @@ int DoCmdUdp(char **cmdline) {
     return (0);
 }
 
+int DoCmdTcp(char **cmdline) {
+    char *ptr;
+    u_int16_t port;
+    int no, ret;
+
+    if ((ptr = strtok_r(NULL, " \r\n", cmdline)) == NULL) {
+        printf("DoCmdTcp:no arg\n");
+        return (-1);
+    }
+    if (strcmp(ptr, "listen") == 0) {
+        if ((ptr = strtok_r(NULL, " \r\n", cmdline)) == NULL) {
+            no = TcpSocketListen(0);
+        } else {
+            port = atoi(ptr);
+            no = TcpSocketListen(port);
+        }
+        printf("DoCmdTcp:no=%d\n", no);
+    } else if (strcmp(ptr, "close") == 0) {
+        if ((ptr = strtok_r(NULL, " \r\n", cmdline)) == NULL) {
+            printf("DoCmdTcp:close:no arg\n");
+            return (-1);
+        }
+        port = atoi(ptr);
+        ret = TcpClose(DeviceSoc, port);
+        printf("DoCmdTcp:ret=%d\n", ret);
+    } else if (strcmp(ptr, "reset") == 0) {
+        if ((ptr = strtok_r(NULL, " \r\n", cmdline)) == NULL) {
+            printf("DoCmdTcp:reset:no arg\n");
+            return (-1);
+        }
+        port = atoi(ptr);
+        ret = TcpReset(DeviceSoc, port);
+        printf("DoCmdTcp:ret=%d\n", ret);
+    } else if (strcmp(ptr, "connect") == 0) {
+        char *p_addr, *p_port;
+        struct in_addr daddr;
+        u_int16_t sport, dport;
+
+        if ((ptr = strtok_r(NULL, " \r\n", cmdline)) == NULL) {
+            printf("DoCmdTcp:connect:no arg\n");
+            return (-1);
+        }
+        sport = atoi(ptr);
+
+        if ((p_addr = strtok_r(NULL, ":\r\n", cmdline)) == NULL) {
+            printf("DoCmdTcp:connect:%u no arg\n", sport);
+            return (-1);
+        }
+        if ((p_port = strtok_r(NULL, " \r\n", cmdline)) == NULL) {
+            printf("DoCmdTcp:connect:%u %s:no arg\n", sport, p_addr);
+            return (-1);
+        }
+        inet_aton(p_addr, &daddr);
+        dport = atoi(p_port);
+        TcpConnect(DeviceSoc, sport, &daddr, dport);
+    } else if (strcmp(ptr, "send") == 0) {
+        u_int16_t sport;
+
+        if ((ptr = strtok_r(NULL, " \r\n", cmdline)) == NULL) {
+            printf("DoCmdTcp:send:no arg\n");
+            return (-1);
+        }
+        sport = atoi(ptr);
+
+        if ((ptr = strtok_r(NULL, "\r\n", cmdline)) == NULL) {
+            printf("DoCmdTcp:send:%u no arg\n", sport);
+            return (-1);
+        }
+        MakeString(ptr);
+        TcpSend(DeviceSoc, sport, (u_int8_t *) ptr, strlen(ptr));
+    } else {
+        printf("DoCmdTcp:[%s] unknown\n", ptr);
+        return (-1);
+    }
+
+    return (0);
+}
+
 int DoCmdEnd(char **cmdline) {
     kill(getpid(), SIGTERM);
 
@@ -225,6 +306,11 @@ int DoCmd(char *cmd) {
         printf("udp open port : open udp-recv port\n");
         printf("udp close port : close udp-recv port\n");
         printf("udp send sport daddr:dport data : send udp\n");
+        printf("tcp listen port : listen tcp-accept port\n");
+        printf("tcp close port : close tcp port\n");
+        printf("tcp reset port : reset tcp port\n");
+        printf("tcp connect sport daddr:dport : tcp connect\n");
+        printf("tcp send sport data : send tcp\n");
         printf("end : end program\n");
         printf("---------------------------------------\n");
         return (-1);
@@ -244,6 +330,9 @@ int DoCmd(char *cmd) {
         return (0);
     } else if (strcmp(ptr, "udp") == 0) {
         DoCmdUdp(&saveptr);
+        return (0);
+    } else if (strcmp(ptr, "tcp") == 0) {
+        DoCmdTcp(&saveptr);
         return (0);
     } else if (strcmp(ptr, "end") == 0) {
         DoCmdEnd(&saveptr);
