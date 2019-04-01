@@ -28,10 +28,10 @@
 
 extern PARAM Param;
 
-static char	*ParamFname = NULL;
+static char	*ParamFname=NULL;
 
 int SetDefaultParam() {
-    Param.MTU = DEFAULT_MTU; // Maximum Transmission Unit : 一回のデータ転送で送信可能なIPパケットの最大サイズ
+    Param.MTU = DEFAULT_MTU;
     Param.IpTTL = DEFAULT_IP_TTL;
 
     return (0);
@@ -50,15 +50,15 @@ int ReadParam(char *fname) {
     }
 
     while (1) {
-        fgets(buf, sizeof(buf), fp); // 1行ずつ読み込む
+        fgets(buf, sizeof(buf), fp);
         if (feof(fp)) {
             break;
         }
-        ptr = strtok_r(buf, "=", &saveptr); // トークンに分解
+        ptr = strtok_r(buf, "=", &saveptr);
         if (ptr != NULL) {
             if (strcmp(ptr, "IP-TTL") == 0) {
                 if ((ptr = strtok_r(NULL, "\r\n", &saveptr)) != NULL) {
-                    Param.IpTTL = atoi(ptr); // atoi : integerを表すstringを受け取ってintegerを返す
+                    Param.IpTTL = atoi(ptr);
                 }
             } else if (strcmp(ptr, "MTU") == 0) {
                 if ((ptr = strtok_r(NULL, "\r\n", &saveptr)) != NULL) {
@@ -74,7 +74,7 @@ int ReadParam(char *fname) {
                 }
             } else if (strcmp(ptr, "device") == 0) {
                 if ((ptr = strtok_r(NULL, " \r\n", &saveptr)) != NULL) {
-                    Param.device = strdup(ptr); // stringのduplication
+                    Param.device = strdup(ptr);
                 }
             } else if (strcmp(ptr, "vmac") == 0) {
                 if ((ptr = strtok_r(NULL, " \r\n", &saveptr)) != NULL) {
@@ -87,6 +87,10 @@ int ReadParam(char *fname) {
             } else if (strcmp(ptr, "vmask") == 0) {
                 if ((ptr = strtok_r(NULL, " \r\n", &saveptr)) != NULL) {
                     Param.vmask.s_addr = inet_addr(ptr);
+                }
+            } else if (strcmp(ptr, "DhcpRequestLeaseTime") == 0) {
+                if ((ptr = strtok_r(NULL, " \r\n", &saveptr)) != NULL) {
+                    Param.DhcpRequestLeaseTime = atoi(ptr);
                 }
             }
         }

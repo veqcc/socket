@@ -1,26 +1,29 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <poll.h>
-#include <sys/ioctl.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/if_ether.h>
-#include <linux/if.h>
-#include <arpa/inet.h>
-#include <sys/wait.h>
-#include <pthread.h>
-#include "sock.h"
-#include "ether.h"
-#include "arp.h"
-#include "ip.h"
-#include "icmp.h"
-#include "param.h"
-#include "cmd.h"
+#include	<stdio.h>
+#include	<unistd.h>
+#include	<stdlib.h>
+#include	<string.h>
+#include	<errno.h>
+#include	<poll.h>
+#include	<sys/ioctl.h>
+#include	<netinet/ip_icmp.h>
+#include	<netinet/if_ether.h>
+#include	<netinet/udp.h>
+#include	<linux/if.h>
+#include	<arpa/inet.h>
+#include	<sys/wait.h>
+#include	<pthread.h>
+#include	"sock.h"
+#include	"ether.h"
+#include	"arp.h"
+#include	"ip.h"
+#include	"icmp.h"
+#include	"udp.h"
+#include	"dhcp.h"
+#include	"param.h"
+#include	"cmd.h"
 
-int EndFlag = 0;
-int DeviceSoc;
+int	EndFlag = 0;
+int	DeviceSoc;
 PARAM Param;
 
 void *MyEthThread(void *arg) {
@@ -33,7 +36,7 @@ void *MyEthThread(void *arg) {
     targets[0].events = POLLIN | POLLERR;
 
     while (EndFlag == 0) {
-        switch ((nready = poll(targets, 1, 1000))) { // PF_PACKETのDeviceSocをpollで監視
+        switch ((nready = poll(targets, 1, 1000))) {
             case -1:
                 if (errno != EINTR) {
                     perror("poll");
@@ -46,7 +49,7 @@ void *MyEthThread(void *arg) {
                     if ((len = read(DeviceSoc, buf, sizeof(buf))) <= 0) {
                         perror("read");
                     } else {
-                        EtherRecv(DeviceSoc, buf, len); // イーサネットフレーム解析関数
+                        EtherRecv(DeviceSoc, buf, len);
                     }
                 }
                 break;
@@ -92,6 +95,10 @@ int ending() {
 
     printf("ending\n");
 
+    if (Param.DhcpServer.s_addr != 0) {
+        DhcpSendRelease(DeviceSoc);
+    }
+
     if (DeviceSoc != -1) {
         strcpy(if_req.ifr_name, Param.device);
         if (ioctl(DeviceSoc, SIOCGIFFLAGS, &if_req) < 0) {
@@ -129,24 +136,12 @@ int show_ifreq(char *name) {
         return (-1);
     }
 
-    if (ifreq.ifr_flags & IFF_UP) {
-        printf("UP ");
-    }
-    if (ifreq.ifr_flags & IFF_BROADCAST) {
-        printf("BROADCAST ");
-    }
-    if (ifreq.ifr_flags & IFF_PROMISC) {
-        printf("PROMISC ");
-    }
-    if (ifreq.ifr_flags & IFF_MULTICAST) {
-        printf("MULTICAST ");
-    }
-    if (ifreq.ifr_flags & IFF_LOOPBACK) {
-        printf("LOOPBACK ");
-    }
-    if (ifreq.ifr_flags & IFF_POINTOPOINT) {
-        printf("P2P ");
-    }
+    if (ifreq.ifr_flags & IFF_UP) { printf("UP "); }
+    if (ifreq.ifr_flags & IFF_BROADCAST) { printf("BROADCAST "); }
+    if (ifreq.ifr_flags & IFF_PROMISC) { printf("PROMISC "); }
+    if (ifreq.ifr_flags & IFF_MULTICAST) { printf("MULTICAST "); }
+    if (ifreq.ifr_flags & IFF_LOOPBACK) { printf("LOOPBACK "); }
+    if (ifreq.ifr_flags & IFF_POINTOPOINT) { printf("P2P "); }
     printf("\n");
 
     if (ioctl(soc, SIOCGIFMTU, &ifreq) == -1) {
@@ -202,7 +197,7 @@ int main(int argc, char *argv[]) {
 
     srandom(time(NULL));
 
-    IpRecvBufInit(); // IP受信バッファを-1(未使用)で初期化
+    IpRecvBufInit();
 
     if ((DeviceSoc = init_socket(Param.device)) == -1) {
         exit(-1);
@@ -217,6 +212,7 @@ int main(int argc, char *argv[]) {
     printf("vip=%s\n", inet_ntop(AF_INET, &Param.vip, buf1, sizeof(buf1)));
     printf("vmask=%s\n", inet_ntop(AF_INET, &Param.vmask, buf1, sizeof(buf1)));
     printf("gateway=%s\n", inet_ntop(AF_INET, &Param.gateway, buf1, sizeof(buf1)));
+    printf("DHCP request lease time=%d\n", Param.DhcpRequestLeaseTime);
 
     signal(SIGINT, sig_term);
     signal(SIGTERM, sig_term);
@@ -234,13 +230,29 @@ int main(int argc, char *argv[]) {
         printf("pthread_create:error\n");
     }
 
-    if (ArpCheckGArp(DeviceSoc) == 0) { // IPアドレスの重複を確認
+    if (Param.vip.s_addr == 0) {
+        int count = 0;
+        do {
+            count++;
+            if (count > 5) {
+                printf("DHCP fail\n");
+                return (-1);
+            }
+            DhcpSendDiscover(DeviceSoc);
+            sleep(1);
+        } while (Param.vip.s_addr == 0);
+    }
+
+    if (ArpCheckGArp(DeviceSoc) == 0) {
         printf("GArp check fail\n");
         return (-1);
     }
 
     while (EndFlag == 0) {
         sleep(1);
+        if (Param.DhcpStartTime != 0) {
+            DhcpCheck(DeviceSoc);
+        }
     }
 
     ending();

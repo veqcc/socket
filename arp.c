@@ -226,7 +226,7 @@ int ArpShowTable() {
     return (0);
 }
 
-int GetTargetMac(int soc, struct in_addr *daddr, u_int8_t dmac[6], int gratuitous) {
+int GetTargetMac(int soc,struct in_addr *daddr,u_int8_t dmac[6],int gratuitous) {
     int count;
     struct in_addr addr;
 
@@ -257,7 +257,6 @@ int ArpSend(int soc,u_int16_t op,
             u_int8_t e_smac[6],u_int8_t e_dmac[6],
             u_int8_t smac[6],u_int8_t dmac[6],
             u_int8_t saddr[4],u_int8_t daddr[4]) {
-    // ARP要求を送信する関数
     struct ether_arp arp;
 
     memset(&arp, 0, sizeof(struct ether_arp));
@@ -331,10 +330,10 @@ int ArpRecv(int soc,struct ether_header *eh,u_int8_t *data,int len) {
     ptr += sizeof(struct ether_arp);
     len -= sizeof(struct ether_arp);
 
-    if (ntohs(arp->arp_op) == ARPOP_REQUEST) { // 他からのARP要求(?)
+    if (ntohs(arp->arp_op) == ARPOP_REQUEST) {
         struct in_addr addr;
         addr.s_addr = (arp->arp_tpa[3] << 24) | (arp->arp_tpa[2] << 16) | (arp->arp_tpa[1] << 8) | (arp->arp_tpa[0]);
-        if (isTargetIPAddr(&addr)) { // 自分宛て -> ARPリプライを返す
+        if (isTargetIPAddr(&addr)) {
             printf("--- recv ---[\n");
             print_ether_header(eh);
             print_ether_arp(arp);

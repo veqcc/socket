@@ -68,7 +68,7 @@ int print_icmp(struct icmp *icmp) {
     return (0);
 }
 
-int IcmpSendEchoReply(int soc, struct ip *r_ip, struct icmp *r_icmp, u_int8_t *data,int len,int ip_ttl) {
+int IcmpSendEchoReply(int soc,struct ip *r_ip,struct icmp *r_icmp,u_int8_t *data,int len,int ip_ttl) {
     u_int8_t *ptr;
     u_int8_t sbuf[64 * 1024];
     struct icmp *icmp;
@@ -97,7 +97,7 @@ int IcmpSendEchoReply(int soc, struct ip *r_ip, struct icmp *r_icmp, u_int8_t *d
     return (0);
 }
 
-int IcmpSendEcho(int soc, struct in_addr *daddr,int seqNo,int size) {
+int IcmpSendEcho(int soc,struct in_addr *daddr,int seqNo,int size) {
     int i, psize;
     u_int8_t *ptr;
     u_int8_t sbuf[64 * 1024];
@@ -108,8 +108,8 @@ int IcmpSendEcho(int soc, struct in_addr *daddr,int seqNo,int size) {
     memset(icmp, 0, sizeof(struct icmp));
     icmp->icmp_type = ICMP_ECHO;
     icmp->icmp_code = 0;
-    icmp->icmp_hun.ih_idseq.icd_id = htons((u_int16_t) getpid()); // プロセスID
-    icmp->icmp_hun.ih_idseq.icd_seq = htons((u_int16_t) seqNo); // シーケンス番号
+    icmp->icmp_hun.ih_idseq.icd_id = htons((u_int16_t) getpid());
+    icmp->icmp_hun.ih_idseq.icd_seq = htons((u_int16_t) seqNo);
     icmp->icmp_cksum = 0;
 
     ptr += ECHO_HDR_SIZE;
@@ -120,7 +120,7 @@ int IcmpSendEcho(int soc, struct in_addr *daddr,int seqNo,int size) {
         ptr++;
     }
 
-    icmp->icmp_cksum = checksum((u_int8_t *) sbuf, ptr - sbuf); // ICMPチェックサム
+    icmp->icmp_cksum = checksum((u_int8_t *) sbuf, ptr - sbuf);
 
     printf("=== ICMP echo ===[\n");
     IpSend(soc, &Param.vip, daddr, IPPROTO_ICMP, 0, Param.IpTTL, sbuf, ptr - sbuf);
@@ -132,7 +132,7 @@ int IcmpSendEcho(int soc, struct in_addr *daddr,int seqNo,int size) {
     return (0);
 }
 
-int IcmpSendDestinationUnreachable(int soc, struct in_addr *daddr,struct ip *ip,u_int8_t *data,int len) {
+int IcmpSendDestinationUnreachable(int soc,struct in_addr *daddr,struct ip *ip,u_int8_t *data,int len) {
     u_int8_t *ptr;
     u_int8_t sbuf[64 * 1024];
     struct icmp *icmp;
@@ -167,7 +167,7 @@ int IcmpSendDestinationUnreachable(int soc, struct in_addr *daddr,struct ip *ip,
     return (0);
 }
 
-int PingSend(int soc, struct in_addr *daddr,int size) {
+int PingSend(int soc,struct in_addr *daddr,int size) {
     int i;
 
     for (i = 0; i < PING_SEND_NO; i++) {
@@ -178,7 +178,7 @@ int PingSend(int soc, struct in_addr *daddr,int size) {
     return (0);
 }
 
-int IcmpRecv(int soc, u_int8_t *raw,int raw_len,struct ether_header *eh,struct ip *ip,u_int8_t *data,int len) {
+int IcmpRecv(int soc,u_int8_t *raw,int raw_len,struct ether_header *eh,struct ip *ip,u_int8_t *data,int len) {
     struct icmp *icmp;
     u_int16_t sum;
     int icmpSize;

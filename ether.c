@@ -26,7 +26,6 @@ u_int8_t BcastMac[6]={0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 char *my_ether_ntoa_r(u_int8_t *hwaddr,char *buf) {
     sprintf(buf, "%02x:%02x:%02x:%02x:%02x:%02x", hwaddr[0], hwaddr[1], hwaddr[2], hwaddr[3], hwaddr[4], hwaddr[5]);
-
     return (buf);
 }
 
@@ -122,7 +121,6 @@ int EtherSend(int soc,u_int8_t smac[6],u_int8_t dmac[6],u_int16_t type,u_int8_t 
         return (-1);
     }
 
-    // smacからdmac宛てにtypeのデータを送信する関数
     ptr = sbuf;
     eh = (struct ether_header *) ptr;
     memset(eh, 0, sizeof(struct ether_header));
@@ -134,15 +132,14 @@ int EtherSend(int soc,u_int8_t smac[6],u_int8_t dmac[6],u_int16_t type,u_int8_t 
     memcpy(ptr, data, len);
     ptr += len;
 
-    // フレームサイズが60バイトより小さい場合、末尾にパディングして送信
     if ((ptr - sbuf) < ETH_ZLEN) {
         padlen = ETH_ZLEN - (ptr - sbuf);
         memset(ptr, 0, padlen);
         ptr += padlen;
     }
 
-    write(soc, sbuf, ptr - sbuf); // PF_PACKET用のディスクリプタに送信
-    print_ether_header(eh); // 送信内容を標準出力する
+    write(soc, sbuf, ptr - sbuf);
+    print_ether_header(eh);
 
     return (0);
 }
@@ -156,15 +153,13 @@ int EtherRecv(int soc,u_int8_t *in_ptr,int in_len) {
     ptr += sizeof(struct ether_header);
     len -= sizeof(struct ether_header);
 
-    // 宛先MACアドレスがvmac宛かあてかブロードキャスト宛以外の時はスルー
     if (memcmp(eh->ether_dhost, BcastMac, 6) != 0 && memcmp(eh->ether_dhost, Param.vmac, 6) != 0) {
         return (-1);
     }
 
-    //
-    if (ntohs(eh->ether_type) == ETHERTYPE_ARP) { // タイプがARPの場合
+    if (ntohs(eh->ether_type) == ETHERTYPE_ARP) {
         ArpRecv(soc, eh, ptr, len);
-    } else if (ntohs(eh->ether_type) == ETHERTYPE_IP) { // タイプがIPの場合
+    } else if (ntohs(eh->ether_type) == ETHERTYPE_IP) {
         IpRecv(soc, in_ptr, in_len, eh, ptr, len);
     }
 

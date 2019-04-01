@@ -10,12 +10,12 @@
 #include	<netinet/ip_icmp.h>
 #include	<netinet/if_ether.h>
 #include	<netinet/udp.h>
-#include	<netinet/tcp.h>
 #include	<arpa/inet.h>
 #include	"sock.h"
 #include	"ether.h"
 #include	"arp.h"
 #include	"ip.h"
+#include	"udp.h"
 #include	"icmp.h"
 #include	"param.h"
 
@@ -80,7 +80,7 @@ void print_ip(struct ip *ip) {
 int IpRecvBufInit() {
     int i;
 
-    for (i = 0; i < IP_RECV_BUF_NO; i++) { // IP_RECV_BUF_NO = 16
+    for (i = 0; i < IP_RECV_BUF_NO; i++) {
         IpRecvBuf[i].id = -1;
     }
 
@@ -179,7 +179,7 @@ int IpRecv(int soc,u_int8_t *raw,int raw_len,struct ether_header *eh,u_int8_t *d
         printf("bad ip checksum\n");
         return (-1);
     }
-    
+
     plen = ntohs(ip->ip_len) - ip->ip_hl * 4;
 
     no = IpRecvBufAdd(ntohs(ip->ip_id));
@@ -189,6 +189,8 @@ int IpRecv(int soc,u_int8_t *raw,int raw_len,struct ether_header *eh,u_int8_t *d
         IpRecvBuf[no].len = off + plen;
         if (ip->ip_p == IPPROTO_ICMP) {
             IcmpRecv(soc, raw, raw_len, eh, ip, IpRecvBuf[no].data, IpRecvBuf[no].len);
+        } else if (ip->ip_p == IPPROTO_UDP) {
+            UdpRecv(soc, eh, ip, IpRecvBuf[no].data, IpRecvBuf[no].len);
         }
         IpRecvBufDel(ntohs(ip->ip_id));
     }
@@ -207,12 +209,11 @@ int IpSendLink(int soc,u_int8_t smac[6],u_int8_t dmac[6],struct in_addr *saddr,s
         return (-1);
     }
 
-    id = random(); // IPヘッダのID
+    id = random();
 
     dptr = data;
     lest = len;
 
-    // MTU以下のサイズになるようにフラグメントして送信する
     while (lest > 0) {
         if (lest > Param.MTU - sizeof(struct ip)) {
             sndLen = (Param.MTU - sizeof(struct ip)) / 8 * 8;
@@ -248,7 +249,7 @@ int IpSendLink(int soc,u_int8_t smac[6],u_int8_t dmac[6],struct in_addr *saddr,s
         memcpy(ptr, dptr, sndLen);
         ptr += sndLen;
 
-        EtherSend(soc, smac, dmac, ETHERTYPE_IP, sbuf, ptr - sbuf); // 実際の送信
+        EtherSend(soc, smac, dmac, ETHERTYPE_IP, sbuf, ptr - sbuf);
         print_ip(ip);
 
         dptr += sndLen;
@@ -263,7 +264,7 @@ int IpSend(int soc,struct in_addr *saddr,struct in_addr *daddr,u_int8_t proto,in
     char buf1[80];
     int ret;
 
-    if (GetTargetMac(soc, daddr, dmac, 0)) { // 宛先MACアドレスの取得
+    if (GetTargetMac(soc, daddr, dmac, 0)) {
         ret = IpSendLink(soc, Param.vmac, dmac, saddr, daddr, proto, dontFlagment, ttl, data, len);
     } else {
         printf("IpSend:%s Destination Host Unreachable\n", inet_ntop(AF_INET, daddr, buf1, sizeof(buf1)));

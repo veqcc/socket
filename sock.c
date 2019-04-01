@@ -1,23 +1,21 @@
-#include <stdio.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <limits.h>
-#include <time.h>
-#include <sys/ioctl.h>
-#include <netpacket/packet.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/if_ether.h>
-#include <linux/if.h>
-#include <arpa/inet.h>
-#include "sock.h"
-#include "param.h"
+#include	<stdio.h>
+#include	<ctype.h>
+#include	<unistd.h>
+#include	<stdlib.h>
+#include	<string.h>
+#include	<limits.h>
+#include	<time.h>
+#include	<sys/ioctl.h>
+#include	<netpacket/packet.h>
+#include	<netinet/ip.h>
+#include	<netinet/ip_icmp.h>
+#include	<netinet/if_ether.h>
+#include	<linux/if.h>
+#include	<arpa/inet.h>
+#include	"sock.h"
+#include	"param.h"
 
-extern PARAM Param;
-
-u_int16_t checksum(u_int8_t *data, int len) {
+u_int16_t checksum(u_int8_t *data,int len) {
     u_int32_t sum;
     u_int16_t *ptr;
     int c;
@@ -46,7 +44,7 @@ u_int16_t checksum(u_int8_t *data, int len) {
     return (~sum);
 }
 
-u_int16_t checksum2(u_int8_t *data1, int len1, u_int8_t *data2, int len2) {
+u_int16_t checksum2(u_int8_t *data1,int len1,u_int8_t *data2,int len2) {
     u_int32_t sum;
     u_int16_t *ptr;
     int c;
@@ -93,7 +91,7 @@ u_int16_t checksum2(u_int8_t *data1, int len1, u_int8_t *data2, int len2) {
     return (~sum);
 }
 
-int GetMacAddress(char *device, u_int8_t *hwaddr) {
+int GetMacAddress(char *device,u_int8_t *hwaddr) {
     struct ifreq ifreq;
     int soc;
     u_int8_t *p;
@@ -130,7 +128,7 @@ int DummyWait(int ms) {
 int init_socket(char *device) {
     struct ifreq if_req;
     struct sockaddr_ll sa;
-    int soc; // ソケットディスクリプタ
+    int soc;
 
     if ((soc = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) < 0) {
         perror("socket");
@@ -138,7 +136,7 @@ int init_socket(char *device) {
     }
 
     strcpy(if_req.ifr_name, device);
-    if (ioctl(soc, SIOCGIFINDEX, &if_req) < 0) { // インターフェース番号を取得
+    if (ioctl(soc, SIOCGIFINDEX, &if_req) < 0) {
         perror("ioctl");
         close(soc);
         return (-1);
@@ -160,7 +158,6 @@ int init_socket(char *device) {
     }
 
     if_req.ifr_flags = if_req.ifr_flags | IFF_PROMISC | IFF_UP;
-    // プロミスキャスモードに変更（自分宛て以外のパケットも受信する）
     if (ioctl(soc, SIOCSIFFLAGS, &if_req) < 0) {
         perror("ioctl");
         close(soc);
