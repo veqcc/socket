@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
+#include <netinet/ip_icmp.h>
 #include <netinet/if_ether.h>
 #include <arpa/inet.h>
 #include <pthread.h>
@@ -27,6 +29,95 @@ ARP_TABLE ArpTable[ARP_TABLE_NO];
 pthread_rwlock_t ArpTableLock = PTHREAD_RWLOCK_INITIALIZER;
 
 extern int AllZeroMac[6], BcastMac[6];
+
+char *my_arp_ip_ntoa_r(int ip[4], char *buf) {
+    sprintf(buf, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    return buf;
+}
+
+void print_ether_arp(struct ether_arp *ether_arp) {
+	static char *hrd[] = {
+            "From KA9Q: NET/ROM pseudo.",
+            "Ethernet 10/100Mbps.",
+            "Experimental Ethernet.",
+            "AX.25 Level 2.",
+            "PROnet token ring.",
+            "Chaosnet.",
+            "IEEE 802.2 Ethernet/TR/TB.",
+            "ARCnet.",
+            "APPLEtalk.",
+            "undefine",
+            "undefine",
+            "undefine",
+            "undefine",
+            "undefine",
+            "undefine",
+            "Frame Relay DLCI.",
+            "undefine",
+            "undefine",
+            "undefine",
+            "ATM.",
+            "undefine",
+            "undefine",
+            "undefine",
+            "Metricom STRIP (new IANA id)."
+    };
+    static char *op[] = {
+            "undefined",
+            "ARP request.",
+            "ARP reply.",
+            "RARP request.",
+            "RARP reply.",
+            "undefined",
+            "undefined",
+            "undefined",
+            "InARP request.",
+            "InARP reply.",
+            "(ATM)ARP NAK."
+    };
+    char buf1[80];
+
+    printf("---ether_arp---\n");
+
+    printf("arp_hrd=%u", ntohs(ether_arp->arp_hrd));
+    if (ntohs(ether_arp->arp_hrd) <= 23) {
+        printf("(%s),", hrd[ntohs(ether_arp->arp_hrd)]);
+    } else {
+        printf("(undefined),");
+    }
+    printf("arp_pro=%u", ntohs(ether_arp->arp_pro));
+    switch (ntohs(ether_arp->arp_pro)) {
+        case ETHERTYPE_PUP:
+            printf("(Xerox POP)\n");
+            break;
+        case ETHERTYPE_IP:
+            printf("(IP)\n");
+            break;
+        case ETHERTYPE_ARP:
+            printf("(Address resolution)\n");
+            break;
+        case ETHERTYPE_REVARP:
+            printf("(Reverse ARP)\n");
+            break;
+        default:
+            printf("(unknown)\n");
+            break;
+    }
+    printf("arp_hln=%u,", ether_arp->arp_hln);
+    printf("arp_pln=%u,", ether_arp->arp_pln);
+    printf("arp_op=%u", ntohs(ether_arp->arp_op));
+    if (ntohs(ether_arp->arp_op) <= 10) {
+        printf("(%s)\n", op[ntohs(ether_arp->arp_op)]);
+    } else {
+        printf("(undefine)\n");
+    }
+    printf("arp_sha=%s\n", my_ether_ntoa_r(ether_arp->arp_sha, buf1));
+    printf("arp_spa=%s\n", my_arp_ip_ntoa_r(ether_arp->arp_spa, buf1));
+    printf("arp_tha=%s\n", my_ether_ntoa_r(ether_arp->arp_tha, buf1));
+    printf("arp_tpa=%s\n", my_arp_ip_ntoa_r(ether_arp->arp_tpa, buf1));
+
+    return;
+}
 
 int ArpDelTable(struct in_addr *ipaddr) {
     pthread_rwlock_wrlock(&ArpTableLock);
@@ -122,8 +213,8 @@ int ArpSend(int soc, int op, int e_smac[6], int e_dmac[6], int smac[6], int dmac
     memcpy(arp.arp_spa, saddr, 4);
     memcpy(arp.arp_tpa, daddr, 4);
 
-    printf(" === ARP === \n")
-    EtherSend(soc, e_smac, e_dmac, ETHERTYPE_ARP, &arp, sizeof(struct ether_arp));
+    printf(" === ARP === \n");
+    EtherSend(soc, e_smac, e_dmac, ETHERTYPE_ARP, (int *)&arp, sizeof(struct ether_arp));
     // print_ether_arp(&arp);
     printf("\n");
     return 0;
@@ -168,4 +259,34 @@ int ArpCheckGArp(int soc) {
         return 0;
     }
     return 1;
+}
+
+int ArpRecv(int soc, struct ether_header *eh, int *data, int len) {
+    // get ARP header
+    int *ptr = data;
+    struct ether_arp *arp = (struct ether_arp *) ptr;
+    ptr += sizeof(struct ether_arp);
+    len -= sizeof(struct ether_arp);
+
+    // if arp_op == REQUEST, then it is ARP request from others
+    if (ntohs(arp->arp_op) == ARPOP_REQUEST) {
+        struct in_addr addr;
+        addr.s_addr = (arp->arp_tpa[3] << 24) | (arp->arp_tpa[2] << 16) | (arp->arp_tpa[1] << 8) | (arp->arp_tpa[0]);
+
+        // if dst == me, thne reply ARP
+        if (isTargetIPAddr(&addr)) {
+            printf(" --- recv --- \n");
+            //print_ether_header(eh);
+            //print_ether_arp(arp);
+            printf("\n");
+            addr.s_addr = (arp->arp_spa[3] << 24) | (arp->arp_spa[2] << 16) | (arp->arp_spa[1] << 8) | (arp->arp_spa[0]);
+            ArpAddTable(arp->arp_sha, &addr);
+            ArpSend(soc, ARPOP_REPLY,
+                    Param.vmac, eh->ether_shost,
+                    Param.vmac, arp->arp_sha,
+                    arp->arp_tha, arp->arp_spa);
+        }
+    }
+
+
 }

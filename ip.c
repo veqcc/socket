@@ -1,17 +1,22 @@
 
 #include <stdio.h>
+#include <ctype.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <time.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
+#include <sys/ioctl.h>
 #include <netinet/ip.h>
-#include <net/ethernet.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/if_ether.h>
+#include <arpa/inet.h>
 
 #include "arp.h"
 #include "param.h"
 #include "sock.h"
 #include "ether.h"
+#include "ip.h"
 #include "icmp.h"
 
 #define IP_RECV_BUF_NO 16

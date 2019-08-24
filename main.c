@@ -5,11 +5,14 @@
 #include <errno.h>
 #include <poll.h>
 #include <sys/ioctl.h>
-#include <net/if.h>
-#include <netinet/in.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/if_ether.h>
+#include <linux/if.h>
 #include <arpa/inet.h>
+#include <sys/wait.h>
 #include <pthread.h>
 
+#include "icmp.h"
 #include "arp.h"
 #include "ip.h"
 #include "ether.h"

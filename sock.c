@@ -1,14 +1,20 @@
 
 #include <stdio.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <string.h>
+#include <limits.h>
+#include <time.h>
 #include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <net/if.h>
-#include <netinet/in.h>
+#include <netpacket/packet.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
 #include <netinet/if_ether.h>
+#include <linux/if.h>
+#include <arpa/inet.h>
 
 #include "sock.h"
+#include "param.h"
 
 // 16bitごとの1の補数和を取り、さらにそれの1の補数を取る
 int checksum(int *data, int len) {
@@ -94,7 +100,7 @@ int GetMacAddress(char *device, int *hwaddr) {
         close(soc);
         return -1;
     } else {
-        int p = &ifreq.ifr_hwaddr.sa_data;
+        int *p = (int *)&ifreq.ifr_hwaddr.sa_data;
         memcpy(hwaddr, p, 6);
         close(soc);
         return 1;
@@ -110,7 +116,7 @@ int DummyWait(int ms) {
 }
 
 int init_socket(char *device) {
-    int soc = socket(AF_PACKET, SOCK_RAM, htons(ETH_P_ALL));
+    int soc = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (soc < 0) {
         perror("socket");
         return -1;
@@ -128,8 +134,8 @@ int init_socket(char *device) {
     sa.sll_family = PF_PACKET;
     sa.sll_protocol = htons(ETH_P_ALL);
     sa.sll_ifindex = if_req.ifr_ifindex;
-    if (bind(soc, &sa, sizeof(sa)) < 0) {
-        perror("bind");
+    if (bind(soc, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+        perror("bind\n");
         close(soc);
         return -1;
     }

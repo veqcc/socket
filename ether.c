@@ -1,12 +1,24 @@
 
 #include <stdio.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
+#include <time.h>
+#include <sys/ioctl.h>
+#include <netpacket/packet.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
 #include <netinet/if_ether.h>
+#include <linux/if.h>
+#include <arpa/inet.h>
 
+#include "sock.h"
+#include "ether.h"
 #include "ip.h"
 #include "arp.h"
+#include "icmp.h"
 #include "param.h"
 
 extern PARAM Param;
@@ -86,7 +98,7 @@ int EtherRecv(int soc, int *in_ptr, int in_len) {
     }
 
     if (ntohs(eh->ether_type) == ETHERTYPE_ARP) {
-        ArpRecv(soc, ptr, len);
+        ArpRecv(soc, eh, ptr, len);
     } else if (ntohs(eh->ether_type) == ETHERTYPE_IP) {
         IpRecv(soc, in_ptr, in_len, eh, ptr, len);
     }

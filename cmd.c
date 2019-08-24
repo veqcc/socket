@@ -3,14 +3,22 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-#include <sys/socket.h>
+#include <errno.h>
+#include <poll.h>
+#include <sys/ioctl.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/if_ether.h>
+#include <linux/if.h>
 #include <arpa/inet.h>
+#include <sys/wait.h>
+#include <pthread.h>
 
+#include "sock.h"
 #include "arp.h"
 #include "ether.h"
 #include "param.h"
 #include "icmp.h"
+#include "cmd.h"
 
 extern int DeviceSoc;
 extern PARAM Param;
